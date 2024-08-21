@@ -228,26 +228,34 @@ def align(
             
         with torch.inference_mode():
            if model_type == "torchaudio":
-             # If using torchaudio, directly get logits from the model
-             emissions = model(waveform_segment.to(device)).logits
+              # If using torchaudio, directly get logits from the model
+              emissions = model(waveform_segment.to(device)).logits
            else:
-             # For Hugging Face models, handle preprocessing if required
-             if preprocess:
-               # Ensure processor is defined based on the Hugging Face model
-               sampling_rate = processor.feature_extractor.sampling_rate
-               inputs = processor(waveform_segment.squeeze(), sampling_rate=sampling_rate, return_tensors="pt").to(device)
+              # For Hugging Face models, handle preprocessing if required
+              if preprocess:
+                 sampling_rate = processor.feature_extractor.sampling_rate
+                 inputs = processor(waveform_segment.squeeze(), sampling_rate=sampling_rate, return_tensors="pt").to(device)
 
-               # Perform the forward pass through the model
-               emissions = model(**inputs).logits
-             else:
-               # If no preprocessing is needed, directly get logits from the model
-               emissions = model(waveform_segment.to(device)).logits
+                 # Perform the forward pass through the model
+                 model_output = model(**inputs)
+                 # Check if model_output is a tuple and extract logits
+                 if isinstance(model_output, tuple):
+                    emissions = model_output[0]  # Extract logits from the tuple
+                 else:
+                    emissions = model_output.logits
+              else:
+                 # If no preprocessing is needed, directly get logits from the model
+                 model_output = model(waveform_segment.to(device))
+                 if isinstance(model_output, tuple):
+                    emissions = model_output[0]  # Extract logits from the tuple
+                 else:
+                    emissions = model_output.logits
 
-               # Apply log softmax to the emissions
-               emissions = torch.log_softmax(emissions, dim=-1)
+                    # Apply log softmax to the emissions
+                    emissions = torch.log_softmax(emissions, dim=-1)
 
-               # Detach and move the first emission tensor to the CPU
-               emission = emissions[0].cpu().detach()
+                    # Detach and move the first emission tensor to the CPU
+                    emission = emissions[0].cpu().detach()
 
         blank_id = 0
         for char, code in model_dictionary.items():
