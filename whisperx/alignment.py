@@ -125,8 +125,9 @@ def align(
 
     # Load align model Huggingface processor for audio feature extraction (Normalization)
     if preprocess and model_type == 'huggingface':
-        processor = Wav2Vec2Processor.from_pretrained(
-            DEFAULT_ALIGN_MODELS_HF[model_lang])
+        processor = Wav2Vec2Processor.from_pretrained(DEFAULT_ALIGN_MODELS_HF[model_lang])
+        sampling_rate = processor.feature_extractor.sampling_rate  # Updated way to get sampling rate
+
 
     # 1. Preprocess to keep only characters in dictionary
     total_segments = len(transcript)
@@ -183,7 +184,6 @@ def align(
     
     # 2. Get prediction matrix from alignment model & align
     for sdx, segment in enumerate(transcript):
-        
         t1 = segment["start"]
         t2 = segment["end"]
         text = segment["text"]
@@ -230,7 +230,9 @@ def align(
             if model_type == "torchaudio":
                 emissions = model(waveform_segment.to(device)).logits
             if preprocess:
-                inputs = processor(waveform_segment.squeeze(), sampling_rate=processor.sampling_rate, return_tensors="pt").to(device)
+                sampling_rate = processor.feature_extractor.sampling_rate
+                inputs = processor(waveform_segment.squeeze(), sampling_rate=sampling_rate, return_tensors="pt").to(device)  # Updated here
+
                 emissions = model(**inputs).logits
             else:
                     emissions = model(waveform_segment.to(device)).logits
