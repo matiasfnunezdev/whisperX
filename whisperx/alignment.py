@@ -91,13 +91,14 @@ def load_align_model(language_code, device, model_name=None, model_dir=None):
 
     align_metadata = {"language": language_code, "dictionary": align_dictionary, "type": pipeline_type}
 
-    return align_model, align_metadata
+    return align_model, align_metadata, model_name
 
 
 def align(
     transcript: Iterable[SingleSegment],
     model: torch.nn.Module,
     align_model_metadata: dict,
+    model_name: str,  # Add model_name as a parameter
     audio: Union[str, np.ndarray, torch.Tensor],
     device: str,
     interpolate_method: str = "nearest",
@@ -228,15 +229,18 @@ def align(
             
         with torch.inference_mode():
             if model_type == "torchaudio":
-                emissions = model(waveform_segment.to(device)).logits
-            if preprocess:
-                sampling_rate = processor.feature_extractor.sampling_rate
-                inputs = processor(waveform_segment.squeeze(), sampling_rate=sampling_rate, return_tensors="pt").to(device)  # Updated here
-
-                emissions = model(**inputs).logits
+               emissions = model(waveform_segment.to(device)).logits
             else:
-                    emissions = model(waveform_segment.to(device)).logits
-            emissions = torch.log_softmax(emissions, dim=-1)
+               # Define `inputs` using the processor
+               processor = Wav2Vec2Processor.from_pretrained(model_name)
+               inputs = processor(waveform_segment.squeeze(), sampling_rate=sampling_rate, return_tensors="pt").to(device)
+
+               # Check if the model output is a tuple and extract the logits
+               model_output = model(**inputs)
+            if isinstance(model_output, tuple):
+               emissions = model_output[0]  # Extract the logits
+            else:
+               emissions = model_output.logits
 
         emission = emissions[0].cpu().detach()
 
