@@ -98,7 +98,6 @@ def align(
     transcript: Iterable[SingleSegment],
     model: torch.nn.Module,
     align_model_metadata: dict,
-    model_name: str,  # Add model_name as a parameter
     audio: Union[str, np.ndarray, torch.Tensor],
     device: str,
     interpolate_method: str = "nearest",
@@ -228,21 +227,27 @@ def align(
             lengths = None
             
         with torch.inference_mode():
-            if model_type == "torchaudio":
-               emissions = model(waveform_segment.to(device)).logits
-            else:
-               # Define `inputs` using the processor
-               processor = Wav2Vec2Processor.from_pretrained(model_name)
+           if model_type == "torchaudio":
+             # If using torchaudio, directly get logits from the model
+             emissions = model(waveform_segment.to(device)).logits
+           else:
+             # For Hugging Face models, handle preprocessing if required
+             if preprocess:
+               # Ensure processor is defined based on the Hugging Face model
+               sampling_rate = processor.feature_extractor.sampling_rate
                inputs = processor(waveform_segment.squeeze(), sampling_rate=sampling_rate, return_tensors="pt").to(device)
 
-               # Check if the model output is a tuple and extract the logits
-               model_output = model(**inputs)
-            if isinstance(model_output, tuple):
-               emissions = model_output[0]  # Extract the logits
-            else:
-               emissions = model_output.logits
+               # Perform the forward pass through the model
+               emissions = model(**inputs).logits
+             else:
+               # If no preprocessing is needed, directly get logits from the model
+               emissions = model(waveform_segment.to(device)).logits
 
-        emission = emissions[0].cpu().detach()
+               # Apply log softmax to the emissions
+               emissions = torch.log_softmax(emissions, dim=-1)
+
+               # Detach and move the first emission tensor to the CPU
+               emission = emissions[0].cpu().detach()
 
         blank_id = 0
         for char, code in model_dictionary.items():
