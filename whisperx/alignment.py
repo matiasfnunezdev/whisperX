@@ -25,8 +25,8 @@ DEFAULT_ALIGN_MODELS_TORCH = {
     "en": "WAV2VEC2_ASR_BASE_960H",
     "fr": "VOXPOPULI_ASR_BASE_10K_FR",
     "de": "VOXPOPULI_ASR_BASE_10K_DE",
+    "es": "VOXPOPULI_ASR_BASE_10K_ES",
     "it": "VOXPOPULI_ASR_BASE_10K_IT",
-    "es": "VOXPOPULI_ASR_BASE_10K_ES",    
 }
 
 DEFAULT_ALIGN_MODELS_HF = {
@@ -55,6 +55,9 @@ DEFAULT_ALIGN_MODELS_HF = {
     "ml": "gvs/wav2vec2-large-xlsr-malayalam",
     "no": "NbAiLab/nb-wav2vec2-1b-bokmaal",
     "nn": "NbAiLab/nb-wav2vec2-300m-nynorsk",
+    "sk": "comodoro/wav2vec2-xls-r-300m-sk-cv8",
+    "sl": "anton-l/wav2vec2-large-xlsr-53-slovenian",
+    "hr": "classla/wav2vec2-xls-r-parlaspeech-hr",
 }
 
 
@@ -103,7 +106,6 @@ def align(
     interpolate_method: str = "nearest",
     return_char_alignments: bool = False,
     print_progress: bool = False,
-    preprocess: bool = True,
     combined_progress: bool = False,
 ) -> AlignedTranscriptionResult:
     """
@@ -122,12 +124,6 @@ def align(
     model_dictionary = align_model_metadata["dictionary"]
     model_lang = align_model_metadata["language"]
     model_type = align_model_metadata["type"]
-
-    # Load align model Huggingface processor for audio feature extraction (Normalization)
-    if preprocess and model_type == 'huggingface':
-        processor = Wav2Vec2Processor.from_pretrained(DEFAULT_ALIGN_MODELS_HF[model_lang])
-        sampling_rate = processor.feature_extractor.sampling_rate  # Updated way to get sampling rate
-
 
     # 1. Preprocess to keep only characters in dictionary
     total_segments = len(transcript)
@@ -184,6 +180,7 @@ def align(
     
     # 2. Get prediction matrix from alignment model & align
     for sdx, segment in enumerate(transcript):
+        
         t1 = segment["start"]
         t2 = segment["end"]
         text = segment["text"]
@@ -227,38 +224,14 @@ def align(
             lengths = None
             
         with torch.inference_mode():
-         if model_type == "torchaudio":
-            # If using torchaudio, directly get logits from the model
-            emissions = model(waveform_segment.to(device)).logits
-         else:
-            # For Hugging Face models, handle preprocessing if required
-            if preprocess:
-               sampling_rate = processor.feature_extractor.sampling_rate
-               inputs = processor(waveform_segment.squeeze(), sampling_rate=sampling_rate, return_tensors="pt").to(device)
-
-                # Perform the forward pass through the model
-               model_output = model(**inputs)
+            if model_type == "torchaudio":
+                emissions, _ = model(waveform_segment.to(device), lengths=lengths)
+            elif model_type == "huggingface":
+                emissions = model(waveform_segment.to(device)).logits
             else:
-               # If no preprocessing is needed, directly get logits from the model
-               model_output = model(waveform_segment.to(device))
+                raise NotImplementedError(f"Align model of type {model_type} not supported.")
+            emissions = torch.log_softmax(emissions, dim=-1)
 
-               # Check if model_output is a tuple and extract logits
-            if isinstance(model_output, tuple):
-               # Handle different potential structures of model_output
-               if hasattr(model_output, 'logits'):
-                emissions = model_output.logits
-               elif hasattr(model_output[0], 'logits'):
-                emissions = model_output[0].logits
-               else:
-                # If no logits attribute is found, raise an informative error
-                raise ValueError(f"Unexpected model output structure: {model_output}")
-            else:
-               emissions = model_output.logits
-
-               # Apply log softmax to the emissions
-               emissions = torch.log_softmax(emissions, dim=-1)
-
-        # Detach and move the first emission tensor to the CPU
         emission = emissions[0].cpu().detach()
 
         blank_id = 0
@@ -361,11 +334,8 @@ def align(
                 aligned_subsegments[-1]["chars"] = curr_chars
 
         aligned_subsegments = pd.DataFrame(aligned_subsegments)
-        # fix nans of start/end
-        seq_timecode_vals = aligned_subsegments[["start", "end"]].values.ravel("C")
-        filled_seq_timecodes = interpolate_nans(pd.Series(seq_timecode_vals), method=interpolate_method)
-        aligned_subsegments["start"] = filled_seq_timecodes.iloc[::2].values
-        aligned_subsegments["end"] = filled_seq_timecodes.iloc[1::2].values
+        aligned_subsegments["start"] = interpolate_nans(aligned_subsegments["start"], method=interpolate_method)
+        aligned_subsegments["end"] = interpolate_nans(aligned_subsegments["end"], method=interpolate_method)
         # concatenate sentences with same timestamps
         agg_dict = {"text": " ".join, "words": "sum"}
         if model_lang in LANGUAGES_WITHOUT_SPACES:
