@@ -244,7 +244,7 @@ def align(
 
                # Check if model_output is a tuple and extract logits
             if isinstance(model_output, tuple):
-               emissions = model_output[0]  # Extract logits from the tuple
+               emissions = model_output[0] if hasattr(model_output[0], 'logits') else model_output.logits
             else:
                emissions = model_output.logits
 
