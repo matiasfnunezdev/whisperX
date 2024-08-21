@@ -26,6 +26,7 @@ DEFAULT_ALIGN_MODELS_TORCH = {
     "fr": "VOXPOPULI_ASR_BASE_10K_FR",
     "de": "VOXPOPULI_ASR_BASE_10K_DE",
     "it": "VOXPOPULI_ASR_BASE_10K_IT",
+    "es": "VOXPOPULI_ASR_BASE_10K_ES",    
 }
 
 DEFAULT_ALIGN_MODELS_HF = {
@@ -54,7 +55,6 @@ DEFAULT_ALIGN_MODELS_HF = {
     "ml": "gvs/wav2vec2-large-xlsr-malayalam",
     "no": "NbAiLab/nb-wav2vec2-1b-bokmaal",
     "nn": "NbAiLab/nb-wav2vec2-300m-nynorsk",
-    "es": "facebook/wav2vec2-base-10k-voxpopuli-ft-es",
 }
 
 
