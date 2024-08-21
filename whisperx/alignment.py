@@ -25,7 +25,6 @@ DEFAULT_ALIGN_MODELS_TORCH = {
     "en": "WAV2VEC2_ASR_BASE_960H",
     "fr": "VOXPOPULI_ASR_BASE_10K_FR",
     "de": "VOXPOPULI_ASR_BASE_10K_DE",
-    "es": "VOXPOPULI_ASR_BASE_10K_ES",
     "it": "VOXPOPULI_ASR_BASE_10K_IT",
 }
 
@@ -58,6 +57,7 @@ DEFAULT_ALIGN_MODELS_HF = {
     "sk": "comodoro/wav2vec2-xls-r-300m-sk-cv8",
     "sl": "anton-l/wav2vec2-large-xlsr-53-slovenian",
     "hr": "classla/wav2vec2-xls-r-parlaspeech-hr",
+    "es": "facebook/wav2vec2-base-10k-voxpopuli-ft-es",
 }
 
 
