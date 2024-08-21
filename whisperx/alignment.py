@@ -244,7 +244,14 @@ def align(
 
                # Check if model_output is a tuple and extract logits
             if isinstance(model_output, tuple):
-               emissions = model_output[0] if hasattr(model_output[0], 'logits') else model_output.logits
+               # Handle different potential structures of model_output
+               if hasattr(model_output, 'logits'):
+                emissions = model_output.logits
+               elif hasattr(model_output[0], 'logits'):
+                emissions = model_output[0].logits
+               else:
+                # If no logits attribute is found, raise an informative error
+                raise ValueError(f"Unexpected model output structure: {model_output}")
             else:
                emissions = model_output.logits
 
