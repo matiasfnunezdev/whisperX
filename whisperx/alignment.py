@@ -91,7 +91,7 @@ def load_align_model(language_code, device, model_name=None, model_dir=None):
 
     align_metadata = {"language": language_code, "dictionary": align_dictionary, "type": pipeline_type}
 
-    return align_model, align_metadata, model_name
+    return align_model, align_metadata
 
 
 def align(
