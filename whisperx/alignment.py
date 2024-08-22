@@ -1,4 +1,4 @@
-""""
+"""
 Forced Alignment with Whisper
 C. Max Bain
 """
@@ -60,8 +60,11 @@ DEFAULT_ALIGN_MODELS_HF = {
     "es": "facebook/wav2vec2-base-10k-voxpopuli-ft-es",
 }
 
-
 def load_align_model(language_code, device, model_name=None, model_dir=None):
+    # Define the local model path for the specific Spanish model
+    specific_local_model = "facebook/wav2vec2-base-10k-voxpopuli-ft-es"
+    local_model_dir = "./models/wav2vec2-es/"
+    
     if model_name is None:
         # use default model
         if language_code in DEFAULT_ALIGN_MODELS_TORCH:
@@ -73,24 +76,37 @@ def load_align_model(language_code, device, model_name=None, model_dir=None):
                 Please find a wav2vec2.0 model finetuned on this language in https://huggingface.co/models, then pass the model name in --align_model [MODEL_NAME]")
             raise ValueError(f"No default align-model for language: {language_code}")
 
-    if model_name in torchaudio.pipelines.__all__:
-        pipeline_type = "torchaudio"
-        bundle = torchaudio.pipelines.__dict__[model_name]
-        align_model = bundle.get_model(dl_kwargs={"model_dir": model_dir}).to(device)
-        labels = bundle.get_labels()
-        align_dictionary = {c.lower(): i for i, c in enumerate(labels)}
-    else:
+    # Check if the model is the specific one for Spanish and load it locally
+    if model_name == specific_local_model:
         try:
-            processor = Wav2Vec2Processor.from_pretrained(model_name)
-            align_model = Wav2Vec2ForCTC.from_pretrained(model_name)
+            processor = Wav2Vec2Processor.from_pretrained(local_model_dir)
+            align_model = Wav2Vec2ForCTC.from_pretrained(local_model_dir)
         except Exception as e:
             print(e)
-            print(f"Error loading model from huggingface, check https://huggingface.co/models for finetuned wav2vec2.0 models")
-            raise ValueError(f'The chosen align_model "{model_name}" could not be found in huggingface (https://huggingface.co/models) or torchaudio (https://pytorch.org/audio/stable/pipelines.html#id14)')
+            print("Error loading model from local directories. Make sure the model is saved correctly.")
+            raise ValueError(f'The chosen align_model "{model_name}" could not be loaded from the local directories')
         pipeline_type = "huggingface"
-        align_model = align_model.to(device)
-        labels = processor.tokenizer.get_vocab()
-        align_dictionary = {char.lower(): code for char,code in processor.tokenizer.get_vocab().items()}
+    else:
+        # Proceed with the standard loading for other models
+        if model_name in torchaudio.pipelines.__all__:
+            pipeline_type = "torchaudio"
+            bundle = torchaudio.pipelines.__dict__[model_name]
+            align_model = bundle.get_model(dl_kwargs={"model_dir": model_dir}).to(device)
+            labels = bundle.get_labels()
+            align_dictionary = {c.lower(): i for i, c in enumerate(labels)}
+        else:
+            try:
+                processor = Wav2Vec2Processor.from_pretrained(model_name)
+                align_model = Wav2Vec2ForCTC.from_pretrained(model_name)
+            except Exception as e:
+                print(e)
+                print(f"Error loading model from huggingface, check https://huggingface.co/models for finetuned wav2vec2.0 models")
+                raise ValueError(f'The chosen align_model "{model_name}" could not be found in huggingface (https://huggingface.co/models) or torchaudio (https://pytorch.org/audio/stable/pipelines.html#id14)')
+            pipeline_type = "huggingface"
+
+    align_model = align_model.to(device)
+    labels = processor.tokenizer.get_vocab() if pipeline_type == "huggingface" else bundle.get_labels()
+    align_dictionary = {char.lower(): code for char, code in labels.items()} if pipeline_type == "huggingface" else {c.lower(): i for i, c in enumerate(labels)}
 
     align_metadata = {"language": language_code, "dictionary": align_dictionary, "type": pipeline_type}
 
@@ -249,7 +265,7 @@ def align(
 
         char_segments = merge_repeats(path, text_clean)
 
-        duration = t2 -t1
+        duration = t2 - t1
         ratio = duration * waveform_segment.size(0) / (trellis.size(0) - 1)
 
         # assign timestamps to aligned characters
@@ -300,7 +316,7 @@ def align(
                 if len(word_text) == 0:
                     continue
 
-                # dont use space character for alignment
+                # don't use space character for alignment
                 word_chars = word_chars[word_chars["char"] != " "]
 
                 word_start = word_chars["start"].min()
@@ -360,7 +376,7 @@ def get_trellis(emission, tokens, blank_id=0):
     num_frame = emission.size(0)
     num_tokens = len(tokens)
 
-    # Trellis has extra diemsions for both time axis and tokens.
+    # Trellis has extra dimensions for both time axis and tokens.
     # The extra dim for tokens represents <SoS> (start-of-sentence)
     # The extra dim for time axis is for simplification of the code.
     trellis = torch.empty((num_frame + 1, num_tokens + 1))
