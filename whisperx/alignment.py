@@ -63,7 +63,7 @@ DEFAULT_ALIGN_MODELS_HF = {
 def load_align_model(language_code, device, model_name=None, model_dir=None):
     # Define the local model path for the specific Spanish model
     specific_local_model = "facebook/wav2vec2-base-10k-voxpopuli-ft-es"
-    local_model_dir = "./models/wav2vec2-es/"
+    local_model_dir = "models/wav2vec2-es/"
     
     if model_name is None:
         # use default model
