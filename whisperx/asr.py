@@ -274,7 +274,7 @@ def load_model(whisper_arch,
                model : Optional[WhisperModel] = None,
                task="transcribe",
                download_root=None,
-               local_files_only=False,
+               local_files_only=True,
                threads=4):
     '''Load a Whisper model for inference.
     Args:
