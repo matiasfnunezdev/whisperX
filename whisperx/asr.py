@@ -171,7 +171,7 @@ class FasterWhisperPipeline(Pipeline):
         return final_iterator
 
     def transcribe(
-        self, audio: Union[str, np.ndarray], batch_size=None, num_workers=0, language=None, task=None, chunk_size=30, print_progress = False, combined_progress=False, suppress_numerals=None, to_streaming=False
+        self, audio: Union[str, np.ndarray], batch_size=None, num_workers=0, language=None, task=None, chunk_size=30, print_progress = False, combined_progress=False
     ) -> TranscriptionResult:
         if isinstance(audio, str):
             audio = load_audio(audio)
@@ -204,10 +204,7 @@ class FasterWhisperPipeline(Pipeline):
                                                                     self.model.model.is_multilingual, task=task,
                                                                     language=language)
                 
-        if suppress_numerals == None or not isinstance(suppress_numerals, bool):
-            suppress_numerals = self.suppress_numerals
-
-        if suppress_numerals:
+        if self.suppress_numerals:
             previous_suppress_tokens = self.options.suppress_tokens
             numeral_symbol_tokens = find_numeral_symbol_tokens(self.tokenizer)
             print(f"Suppressing numeral and symbol tokens")
@@ -226,10 +223,6 @@ class FasterWhisperPipeline(Pipeline):
             text = out['text']
             if batch_size in [0, 1, None]:
                 text = text[0]
-                # enable streaming
-            if to_streaming:
-                yield text
-                continue
             segments.append(
                 {
                     "text": text,
@@ -243,11 +236,11 @@ class FasterWhisperPipeline(Pipeline):
             self.tokenizer = None
 
         # revert suppressed tokens if suppress_numerals is enabled
-        if suppress_numerals:
+        if self.suppress_numerals:
             self.options = self.options._replace(suppress_tokens=previous_suppress_tokens)
 
-        if not to_streaming:
-            return {"segments": segments, "language": language}
+        return {"segments": segments, "language": language}
+
 
     def detect_language(self, audio: np.ndarray):
         if audio.shape[0] < N_SAMPLES:
